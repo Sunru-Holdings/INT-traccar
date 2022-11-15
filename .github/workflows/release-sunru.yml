@@ -58,10 +58,9 @@ jobs:
           mv traccar-*.zip artifacts/
       - name: Upload installers
         uses: shallwefootball/s3-upload-action@master
-        working-directory: ./setup
         with:
           aws_key_id: ${{ secrets.AWS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: '../artifacts'
+          source_dir: 'setup/artifacts'
           destination_dir: 'general_releases/${{ github.event.inputs.version }}'
