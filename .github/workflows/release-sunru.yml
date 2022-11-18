@@ -64,3 +64,8 @@ jobs:
           aws_bucket: ${{ secrets.AWS_BUCKET }}
           source_dir: 'setup/artifacts'
           destination_dir: 'general_releases/${{ github.event.inputs.version }}'
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "setup/artifacts/traccar-*.zip"
+          tag: "${{ github.event.inputs.version }}"
