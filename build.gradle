@@ -102,6 +102,7 @@ jar {
         attributes(
                 "Main-Class": "org.traccar.Main",
                 "Implementation-Version": "5.4",
+                "Sub-Version": "5.4.s2",
                 "Class-Path": configurations.runtimeClasspath.files.collect { "lib/$it.name" }.join(" "))
     }
 }
