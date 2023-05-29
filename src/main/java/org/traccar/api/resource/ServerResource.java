@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 - 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 package org.traccar.api.resource;
 
 import org.traccar.api.BaseResource;
+import org.traccar.database.OpenIdProvider;
+import org.traccar.helper.model.UserUtil;
 import org.traccar.mail.MailManager;
 import org.traccar.geocoder.Geocoder;
 import org.traccar.helper.Log;
@@ -23,6 +25,7 @@ import org.traccar.helper.LogAction;
 import org.traccar.model.Server;
 import org.traccar.model.User;
 import org.traccar.session.cache.CacheManager;
+import org.traccar.sms.SmsManager;
 import org.traccar.storage.StorageException;
 import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
@@ -56,6 +59,14 @@ public class ServerResource extends BaseResource {
 
     @Inject
     @Nullable
+    private SmsManager smsManager;
+
+    @Inject
+    @Nullable
+    private OpenIdProvider openIdProvider;
+
+    @Inject
+    @Nullable
     private Geocoder geocoder;
 
     @PermitAll
@@ -63,8 +74,18 @@ public class ServerResource extends BaseResource {
     public Server get() throws StorageException {
         Server server = storage.getObject(Server.class, new Request(new Columns.All()));
         server.setEmailEnabled(mailManager.getEmailEnabled());
+        server.setTextEnabled(smsManager != null);
         server.setGeocoderEnabled(geocoder != null);
+        server.setOpenIdEnabled(openIdProvider != null);
+        server.setOpenIdForce(openIdProvider != null && openIdProvider.getForce());
         User user = permissionsService.getUser(getUserId());
+        if (user != null) {
+            if (user.getAdministrator()) {
+                server.setStorageSpace(Log.getStorageSpace());
+            }
+        } else {
+            server.setNewServer(UserUtil.isEmpty(storage));
+        }
         if (user != null && user.getAdministrator()) {
             server.setStorageSpace(Log.getStorageSpace());
         }

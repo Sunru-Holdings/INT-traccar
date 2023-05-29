@@ -99,8 +99,8 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_LBS_2 = 0xA1;              // GK310
     public static final int MSG_WIFI_3 = 0xA2;             // GK310
     public static final int MSG_FENCE_SINGLE = 0xA3;       // GK310
-    public static final int MSG_FENCE_MULTI = 0xA4;        // GK310
-    public static final int MSG_LBS_ALARM = 0xA5;          // GK310
+    public static final int MSG_FENCE_MULTI = 0xA4;        // GK310 & JM-LL301
+    public static final int MSG_LBS_ALARM = 0xA5;          // GK310 & JM-LL301
     public static final int MSG_LBS_ADDRESS = 0xA7;        // GK310
     public static final int MSG_OBD = 0x8C;                // FM08ABC
     public static final int MSG_DTC = 0x65;                // FM08ABC
@@ -119,6 +119,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
         SPACE10X,
         STANDARD,
         OBD6,
+        WETRUST,
     }
 
     private Variant variant;
@@ -209,6 +210,8 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             case MSG_GPS_LBS_STATUS_2:
             case MSG_GPS_LBS_STATUS_3:
             case MSG_GPS_LBS_STATUS_4:
+            case MSG_FENCE_MULTI:
+            case MSG_LBS_ALARM:
                 return true;
             default:
                 return false;
@@ -334,9 +337,26 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
         }
 
         int mcc = buf.readUnsignedShort();
-        int mnc = BitUtil.check(mcc, 15) || type == MSG_GPS_LBS_6 ? buf.readUnsignedShort() : buf.readUnsignedByte();
-        int lac = buf.readUnsignedShort();
-        long cid = type == MSG_GPS_LBS_6 ? buf.readUnsignedInt() : buf.readUnsignedMedium();
+        int mnc;
+        if (BitUtil.check(mcc, 15) || type == MSG_GPS_LBS_6) {
+            mnc = buf.readUnsignedShort();
+        } else {
+            mnc = buf.readUnsignedByte();
+        }
+        int lac;
+        if (type == MSG_LBS_ALARM) {
+            lac = buf.readInt();
+        } else {
+            lac = buf.readUnsignedShort();
+        }
+        long cid;
+        if (type == MSG_LBS_ALARM) {
+            cid = buf.readLong();
+        } else if (type == MSG_GPS_LBS_6) {
+            cid = buf.readUnsignedInt();
+        } else {
+            cid = buf.readUnsignedMedium();
+        }
 
         position.setNetwork(new Network(CellTower.from(BitUtil.to(mcc, 15), mnc, lac, cid)));
 
@@ -401,6 +421,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                 return Position.ALARM_OVERSPEED;
             case 0x0E:
             case 0x0F:
+            case 0x19:
                 return Position.ALARM_LOW_BATTERY;
             case 0x11:
                 return Position.ALARM_POWER_OFF;
@@ -410,6 +431,8 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                 return Position.ALARM_TAMPERING;
             case 0x14:
                 return Position.ALARM_DOOR;
+            case 0x18:
+                return Position.ALARM_REMOVING;
             case 0x23:
                 return Position.ALARM_FALL_DOWN;
             case 0x29:
@@ -782,8 +805,8 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                 getLastLocation(position, null);
             }
 
-            if (hasLbs(type)) {
-                decodeLbs(position, buf, type, hasStatus(type));
+            if (hasLbs(type) && buf.readableBytes() > 6) {
+                decodeLbs(position, buf, type, hasStatus(type) && type != MSG_LBS_ALARM && type != MSG_LBS_STATUS);
             }
 
             if (hasStatus(type)) {
@@ -811,7 +834,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                     String data = buf.readCharSequence(buf.readUnsignedByte(), StandardCharsets.US_ASCII).toString();
                     buf.readUnsignedByte(); // alarm
                     buf.readUnsignedByte(); // swiped
-                    position.set("driverLicense", data.trim());
+                    position.set(Position.KEY_CARD, data.trim());
                 } else if (variant == Variant.BENWAY) {
                     int mask = buf.readUnsignedShort();
                     position.set(Position.KEY_IGNITION, BitUtil.check(mask, 8 + 7));
@@ -847,6 +870,13 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                     }
                     position.set(Position.PREFIX_TEMP + 1, temperature);
                     position.set(Position.KEY_ODOMETER, buf.readUnsignedInt() * 10);
+                } else if (variant == Variant.WETRUST) {
+                    position.set(Position.KEY_ODOMETER, buf.readUnsignedInt());
+                    position.set(Position.KEY_CARD, buf.readCharSequence(
+                            buf.readUnsignedByte(), StandardCharsets.US_ASCII).toString());
+                    position.set(Position.KEY_ALARM, buf.readUnsignedByte() > 0 ? Position.ALARM_GENERAL : null);
+                    position.set("cardStatus", buf.readUnsignedByte());
+                    position.set(Position.KEY_DRIVING_TIME, buf.readUnsignedShort());
                 }
             }
 
@@ -996,6 +1026,29 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             if (subType == 0x00) {
 
                 position.set(Position.PREFIX_ADC + 1, buf.readUnsignedShort() * 0.01);
+                return position;
+
+            } else if (subType == 0x04) {
+
+                CharSequence content = buf.readCharSequence(buf.readableBytes() - 4 - 2, StandardCharsets.US_ASCII);
+                String[] values = content.toString().split(";");
+                for (String value : values) {
+                    String[] pair = value.split("=");
+                    switch (pair[0]) {
+                        case "ALM1":
+                        case "ALM2":
+                        case "ALM3":
+                            position.set("alarm" + pair[0].charAt(3) + "Status", Integer.parseInt(pair[1], 16));
+                        case "STA1":
+                            position.set("otherStatus", Integer.parseInt(pair[1], 16));
+                            break;
+                        case "DYD":
+                            position.set("engineStatus", Integer.parseInt(pair[1], 16));
+                            break;
+                        default:
+                            break;
+                    }
+                }
                 return position;
 
             } else if (subType == 0x05) {
@@ -1369,6 +1422,8 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             variant = Variant.SPACE10X;
         } else if (header == 0x7878 && type == MSG_STATUS && length == 0x13) {
             variant = Variant.OBD6;
+        } else if (header == 0x7878 && type == MSG_GPS_LBS_1 && length == 0x29) {
+            variant = Variant.WETRUST;
         } else {
             variant = Variant.STANDARD;
         }

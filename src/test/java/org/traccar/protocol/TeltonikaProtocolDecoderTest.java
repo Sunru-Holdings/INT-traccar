@@ -1,8 +1,9 @@
 package org.traccar.protocol;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.traccar.ProtocolTest;
+import org.traccar.model.Position;
 
 public class TeltonikaProtocolDecoderTest extends ProtocolTest {
 
@@ -13,6 +14,10 @@ public class TeltonikaProtocolDecoderTest extends ProtocolTest {
 
         verifyNull(decoder, binary(
                 "000F313233343536373839303132333435"));
+
+        verifyAttribute(decoder, binary(
+                "00000000000000240d01060000001c642b3ad14754534c7c367c317c307c31323734393838347c317c0d0a010000ec11"),
+                Position.KEY_DRIVER_UNIQUE_ID, "12749884");
 
         verifyPositions(decoder, binary(
                 "00000000000000a28e0100000183ac617e3001123eb99b1e142db4000000000000000000001d000900f000005000001503004500011e1801212d01242a012722012a18001100b5000000b600000018000000cd151000431c2d011f6981012047d701226981012347d901256981012647d8012869810129e6f304b0000304b1000304b2000304b30003000100f10000639d0002000b0000000214bf12fe000e0000000029d18c95000001000051b6"));
@@ -125,6 +130,9 @@ public class TeltonikaProtocolDecoderTest extends ProtocolTest {
         verifyPositions(decoder, binary(
                 "000000000000004a08010000015ebc1da508002411926621f15246010b00b913005e000f06ef01f00150011505c800450108b5000bb6000642381b18005ecd0318ce19cd430f5844000001f1000061a900010000c8e1"));
 
+        verifyNull(decoder, binary(
+                "ff"));
+
         decoder.setExtended(true);
 
         verifyPositions(decoder, false, binary(
@@ -155,7 +163,7 @@ public class TeltonikaProtocolDecoderTest extends ProtocolTest {
 
     }
 
-    @Ignore
+    @Disabled
     @Test
     public void testDecodeConnectionless() throws Exception {
 

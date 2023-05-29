@@ -12,3 +12,5 @@ out
 build
 *.tar.gz
 *.zip
+.vscode
+bin

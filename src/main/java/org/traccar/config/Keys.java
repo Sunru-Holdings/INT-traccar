@@ -293,6 +293,13 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Send device responses immediately before writing it in the database.
+     */
+    public static final ConfigKey<Boolean> SERVER_INSTANT_ACKNOWLEDGEMENT = new BooleanConfigKey(
+            "server.instantAcknowledgement",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Address for uploading aggregated anonymous usage statistics. Uploaded information is the same you can see on the
      * statistics screen in the web app. It does not include any sensitive (e.g. locations).
      */
@@ -366,14 +373,15 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> EVENT_MOTION_PROCESS_INVALID_POSITIONS = new BooleanConfigKey(
             "event.motion.processInvalidPositions",
-            List.of(KeyType.CONFIG));
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            false);
 
     /**
      * If the speed is above specified value, the object is considered to be in motion. Default value is 0.01 knots.
      */
     public static final ConfigKey<Double> EVENT_MOTION_SPEED_THRESHOLD = new DoubleConfigKey(
             "event.motion.speedThreshold",
-            List.of(KeyType.CONFIG),
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
             0.01);
 
     /**
@@ -384,6 +392,13 @@ public final class Keys {
             "geofence.polylineDistance",
             List.of(KeyType.CONFIG),
             25.0);
+
+    /**
+     * Enable in-memory database instead of an SQL database.
+     */
+    public static final ConfigKey<Boolean> DATABASE_MEMORY = new BooleanConfigKey(
+            "database.memory",
+            List.of(KeyType.CONFIG));
 
     /**
      * Path to the database driver JAR file. Traccar includes drivers for MySQL, PostgreSQL and H2 databases. If you use
@@ -488,6 +503,13 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Automatically register unknown devices with regex filter.
+     */
+    public static final ConfigKey<String> DATABASE_REGISTER_UNKNOWN_REGEX = new StringConfigKey(
+            "database.registerUnknown.regex",
+            List.of(KeyType.CONFIG), "\\w{3,15}");
+
+    /**
      * Store empty messages as positions. For example, heartbeats.
      */
     public static final ConfigKey<Boolean> DATABASE_SAVE_EMPTY = new BooleanConfigKey(
@@ -510,7 +532,7 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
-     * LDAP server URL.
+     * LDAP server URL. For more info check <a href="https://www.traccar.org/ldap/">LDAP config</a>.
      */
     public static final ConfigKey<String> LDAP_URL = new StringConfigKey(
             "ldap.url",
@@ -590,6 +612,85 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Force OpenID Connect authentication. When enabled, the Traccar login page will be skipped
+     * and users are redirected to the OpenID Connect provider.
+     */
+    public static final ConfigKey<Boolean> OPENID_FORCE = new BooleanConfigKey(
+            "openid.force",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect Client ID.
+     * This is a unique ID assigned to each application you register with your identity provider.
+     * Required to enable SSO.
+     */
+    public static final ConfigKey<String> OPENID_CLIENT_ID = new StringConfigKey(
+            "openid.clientId",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect Client Secret.
+     * This is a secret assigned to each application you register with your identity provider.
+     * Required to enable SSO.
+     */
+    public static final ConfigKey<String> OPENID_CLIENT_SECRET = new StringConfigKey(
+            "openid.clientSecret",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect Issuer (Base) URL.
+     * This is used to automatically configure the authorization, token and user info URLs if provided.
+     */
+    public static final ConfigKey<String> OPENID_ISSUER_URL = new StringConfigKey(
+            "openid.issuerUrl",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect Authorization URL.
+     * This can usually be found in the documentation of your identity provider or by using the well-known
+     * configuration endpoint, eg. https://auth.example.com//.well-known/openid-configuration
+     * Required to enable SSO if openid.issuerUrl is not set.
+     */
+    public static final ConfigKey<String> OPENID_AUTH_URL = new StringConfigKey(
+            "openid.authUrl",
+            List.of(KeyType.CONFIG));
+    /**
+     * OpenID Connect Token URL.
+     * This can be found in the same ways at openid.authUrl.
+     * Required to enable SSO if openid.issuerUrl is not set.
+     */
+    public static final ConfigKey<String> OPENID_TOKEN_URL = new StringConfigKey(
+            "openid.tokenUrl",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect User Info URL.
+     * This can be found in the same ways at openid.authUrl.
+     * Required to enable SSO if openid.issuerUrl is not set.
+     */
+    public static final ConfigKey<String> OPENID_USERINFO_URL = new StringConfigKey(
+            "openid.userInfoUrl",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect group to restrict access to.
+     * If this is not provided, all OpenID users will have access to Traccar.
+     * This option will only work if your OpenID provider supports the groups scope.
+     */
+    public static final ConfigKey<String> OPENID_ALLOW_GROUP = new StringConfigKey(
+        "openid.allowGroup",
+        List.of(KeyType.CONFIG));
+
+    /**
+     * OpenID Connect group to grant admin access.
+     * If this is not provided, no groups will be granted admin access.
+     * This option will only work if your OpenID provider supports the groups scope.
+     */
+    public static final ConfigKey<String> OPENID_ADMIN_GROUP = new StringConfigKey(
+            "openid.adminGroup",
+            List.of(KeyType.CONFIG));
+
+    /**
      * If no data is reported by a device for the given amount of time, status changes from online to unknown. Value is
      * in seconds. Default timeout is 10 minutes.
      */
@@ -653,12 +754,19 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
-     * WebSocket connection timeout in milliseconds. Default timeout is 10 minutes.
+     * Path to a folder with overrides. It can be used for branding to keep custom logos in a separate place.
+     */
+    public static final ConfigKey<String> WEB_OVERRIDE = new StringConfigKey(
+            "web.override",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * WebSocket connection timeout in milliseconds. Default timeout is 5 minutes.
      */
     public static final ConfigKey<Long> WEB_TIMEOUT = new LongConfigKey(
             "web.timeout",
             List.of(KeyType.CONFIG),
-            60000L);
+            300000L);
 
     /**
      * Authentication sessions timeout in seconds. By default no timeout.
@@ -704,6 +812,13 @@ public final class Keys {
             "web.cacheControl",
             List.of(KeyType.CONFIG),
             "max-age=3600,public");
+
+    /**
+     * Host for raw data forwarding.
+     */
+    public static final ConfigKey<String> SERVER_FORWARD = new StringConfigKey(
+            "server.forward",
+            List.of(KeyType.CONFIG));
 
     /**
      * Position forwarding format. Available options are "url", "json" and "kafka". Default is "url".
@@ -819,6 +934,13 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> MAIL_DEBUG = new BooleanConfigKey(
             "mail.debug",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Restrict global SMTP configuration to system messages only (e.g. password reset).
+     */
+    public static final ConfigKey<Boolean> MAIL_SMTP_SYSTEM_ONLY = new BooleanConfigKey(
+            "mail.smtp.systemOnly",
             List.of(KeyType.CONFIG));
 
     /**
@@ -1049,11 +1171,20 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Time threshold for fast reports. Fast reports are more efficient, but less accurate and missing some information.
+     * The value is in seconds. One day by default.
+     */
+    public static final ConfigKey<Long> REPORT_FAST_THRESHOLD = new LongConfigKey(
+            "report.fastThreshold",
+            List.of(KeyType.CONFIG),
+            86400L);
+
+    /**
      * Trips less than minimal duration and minimal distance are ignored. 300 seconds and 500 meters are default.
      */
     public static final ConfigKey<Long> REPORT_TRIP_MINIMAL_TRIP_DISTANCE = new LongConfigKey(
             "report.trip.minimalTripDistance",
-            List.of(KeyType.CONFIG),
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
             500L);
 
     /**
@@ -1061,7 +1192,7 @@ public final class Keys {
      */
     public static final ConfigKey<Long> REPORT_TRIP_MINIMAL_TRIP_DURATION = new LongConfigKey(
             "report.trip.minimalTripDuration",
-            List.of(KeyType.CONFIG),
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
             300L);
 
     /**
@@ -1069,7 +1200,7 @@ public final class Keys {
      */
     public static final ConfigKey<Long> REPORT_TRIP_MINIMAL_PARKING_DURATION = new LongConfigKey(
             "report.trip.minimalParkingDuration",
-            List.of(KeyType.CONFIG),
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
             300L);
 
     /**
@@ -1077,7 +1208,7 @@ public final class Keys {
      */
     public static final ConfigKey<Long> REPORT_TRIP_MINIMAL_NO_DATA_DURATION = new LongConfigKey(
             "report.trip.minimalNoDataDuration",
-            List.of(KeyType.CONFIG),
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
             3600L);
 
     /**
@@ -1085,7 +1216,8 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> REPORT_TRIP_USE_IGNITION = new BooleanConfigKey(
             "report.trip.useIgnition",
-            List.of(KeyType.CONFIG));
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            false);
 
     /**
      * Ignore odometer value reported by the device and use server-calculated total distance instead. This is useful
@@ -1093,7 +1225,8 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> REPORT_IGNORE_ODOMETER = new BooleanConfigKey(
             "report.ignoreOdometer",
-            List.of(KeyType.CONFIG));
+            List.of(KeyType.CONFIG),
+            false);
 
     /**
      * Boolean flag to enable or disable position filtering.
@@ -1122,6 +1255,14 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> FILTER_DUPLICATE = new BooleanConfigKey(
             "filter.duplicate",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Filter messages that do not have GPS location. If they are not filtered, they will include the last known
+     * location.
+     */
+    public static final ConfigKey<Boolean> FILTER_OUTDATED = new BooleanConfigKey(
+            "filter.outdated",
             List.of(KeyType.CONFIG));
 
     /**
@@ -1298,6 +1439,28 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_DEVICE_ATTRIBUTES = new BooleanConfigKey(
             "processing.computedAttributes.deviceAttributes",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Enable local variables declaration.
+     */
+    public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_LOCAL_VARIABLES = new BooleanConfigKey(
+            "processing.computedAttributes.localVariables",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Enable loops processing.
+     */
+    public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_LOOPS = new BooleanConfigKey(
+            "processing.computedAttributes.loops",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Enable new instances creation.
+     * When disabled, parsing a script/expression using 'new(...)' will throw a parsing exception;
+     */
+    public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_NEW_INSTANCE_CREATION = new BooleanConfigKey(
+            "processing.computedAttributes.newInstanceCreation",
             List.of(KeyType.CONFIG));
 
     /**
@@ -1523,7 +1686,7 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
-     * Public URL for the web app. Used for notification and report link.
+     * Public URL for the web app. Used for notification, report link and OpenID Connect.
      * If not provided, Traccar will attempt to get a URL from the server IP address, but it might be a local address.
      */
     public static final ConfigKey<String> WEB_URL = new StringConfigKey(
@@ -1573,6 +1736,16 @@ public final class Keys {
     public static final ConfigKey<Boolean> LOGGER_ROTATE = new BooleanConfigKey(
             "logger.rotate",
             List.of(KeyType.CONFIG));
+
+    /**
+     * Log file rotation interval, the default rotation interval is once a day.
+     * This option is ignored if 'logger.rotate' = false
+     * Available options: day, hour
+     */
+    public static final ConfigKey<String> LOGGER_ROTATE_INTERVAL = new StringConfigKey(
+            "logger.rotate.interval",
+            List.of(KeyType.CONFIG),
+            "day");
 
     /**
      * A list of position attributes to log.
