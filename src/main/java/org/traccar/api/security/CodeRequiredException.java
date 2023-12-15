@@ -1,6 +1,5 @@
 /*
- * Copyright 2018 Anton Tananaev (anton@traccar.org)
- * Copyright 2018 Andrey Kunitsyn (andrey@traccar.org)
+ * Copyright 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.traccar.model;
+package org.traccar.api.security;
 
-public class ScheduledModel extends ExtendedModel {
-
-    private long calendarId;
-
-    public long getCalendarId() {
-        return calendarId;
-    }
-
-    public void setCalendarId(long calendarId) {
-        this.calendarId = calendarId;
+public class CodeRequiredException extends SecurityException {
+    public CodeRequiredException() {
+        super("Code not provided");
     }
 }

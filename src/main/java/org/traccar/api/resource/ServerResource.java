@@ -16,12 +16,14 @@
 package org.traccar.api.resource;
 
 import org.traccar.api.BaseResource;
+import org.traccar.config.Config;
+import org.traccar.config.Keys;
 import org.traccar.database.OpenIdProvider;
-import org.traccar.helper.model.UserUtil;
-import org.traccar.mail.MailManager;
 import org.traccar.geocoder.Geocoder;
 import org.traccar.helper.Log;
 import org.traccar.helper.LogAction;
+import org.traccar.helper.model.UserUtil;
+import org.traccar.mail.MailManager;
 import org.traccar.model.Server;
 import org.traccar.model.User;
 import org.traccar.session.cache.CacheManager;
@@ -31,17 +33,25 @@ import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
-import javax.annotation.Nullable;
-import javax.annotation.security.PermitAll;
-import javax.inject.Inject;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.annotation.Nullable;
+import jakarta.annotation.security.PermitAll;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.TimeZone;
@@ -50,6 +60,9 @@ import java.util.TimeZone;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class ServerResource extends BaseResource {
+
+    @Inject
+    private Config config;
 
     @Inject
     private CacheManager cacheManager;
@@ -117,6 +130,25 @@ public class ServerResource extends BaseResource {
     @GET
     public Collection<String> timezones() {
         return Arrays.asList(TimeZone.getAvailableIDs());
+    }
+
+    @Path("file/{path}")
+    @POST
+    @Consumes("*/*")
+    public Response uploadImage(@PathParam("path") String path, File inputFile) throws IOException, StorageException {
+        permissionsService.checkAdmin(getUserId());
+        String root = config.getString(Keys.WEB_OVERRIDE, config.getString(Keys.WEB_PATH));
+
+        var outputPath = Paths.get(root, path);
+        var directoryPath = outputPath.getParent();
+        if (directoryPath != null) {
+            Files.createDirectories(directoryPath);
+        }
+
+        try (var input = new FileInputStream(inputFile); var output = new FileOutputStream(outputPath.toFile())) {
+            input.transferTo(output);
+        }
+        return Response.ok().build();
     }
 
 }

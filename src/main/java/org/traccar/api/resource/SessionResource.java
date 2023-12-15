@@ -16,6 +16,7 @@
 package org.traccar.api.resource;
 
 import org.traccar.api.BaseResource;
+import org.traccar.api.security.CodeRequiredException;
 import org.traccar.api.security.LoginService;
 import org.traccar.api.signature.TokenManager;
 import org.traccar.database.OpenIdProvider;
@@ -29,24 +30,24 @@ import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
 import com.nimbusds.oauth2.sdk.ParseException;
-import javax.annotation.Nullable;
-import javax.annotation.security.PermitAll;
-import javax.inject.Inject;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.FormParam;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.annotation.Nullable;
+import jakarta.annotation.security.PermitAll;
+import jakarta.inject.Inject;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -108,7 +109,7 @@ public class SessionResource extends BaseResource {
                 }
             }
             if (email != null && password != null) {
-                User user = loginService.login(email, password);
+                User user = loginService.login(email, password, null);
                 if (user != null) {
                     request.getSession().setAttribute(USER_ID_KEY, user.getId());
                     LogAction.login(user.getId(), WebHelper.retrieveRemoteAddress(request));
@@ -142,8 +143,19 @@ public class SessionResource extends BaseResource {
     @PermitAll
     @POST
     public User add(
-            @FormParam("email") String email, @FormParam("password") String password) throws StorageException {
-        User user = loginService.login(email, password);
+            @FormParam("email") String email,
+            @FormParam("password") String password,
+            @FormParam("code") Integer code) throws StorageException {
+        User user;
+        try {
+            user = loginService.login(email, password, code);
+        } catch (CodeRequiredException e) {
+            Response response = Response
+                    .status(Response.Status.UNAUTHORIZED)
+                    .header("WWW-Authenticate", "TOTP")
+                    .build();
+            throw new WebApplicationException(response);
+        }
         if (user != null) {
             request.getSession().setAttribute(USER_ID_KEY, user.getId());
             LogAction.login(user.getId(), WebHelper.retrieveRemoteAddress(request));
@@ -171,7 +183,7 @@ public class SessionResource extends BaseResource {
     @PermitAll
     @Path("openid/auth")
     @GET
-    public Response openIdAuth() throws IOException {
+    public Response openIdAuth() {
         return Response.seeOther(openIdProvider.createAuthUri()).build();
     }
 

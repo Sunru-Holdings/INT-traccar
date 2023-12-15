@@ -17,7 +17,7 @@ package org.traccar;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr353.JSR353Module;
+import com.fasterxml.jackson.datatype.jsonp.JSONPModule;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
 import com.google.inject.Provides;
@@ -28,6 +28,7 @@ import io.netty.util.Timer;
 import org.apache.velocity.app.VelocityEngine;
 import org.traccar.broadcast.BroadcastService;
 import org.traccar.broadcast.MulticastBroadcastService;
+import org.traccar.broadcast.RedisBroadcastService;
 import org.traccar.broadcast.NullBroadcastService;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
@@ -36,10 +37,12 @@ import org.traccar.database.OpenIdProvider;
 import org.traccar.database.StatisticsManager;
 import org.traccar.forward.EventForwarder;
 import org.traccar.forward.EventForwarderJson;
+import org.traccar.forward.EventForwarderAmqp;
 import org.traccar.forward.EventForwarderKafka;
 import org.traccar.forward.EventForwarderMqtt;
 import org.traccar.forward.PositionForwarder;
 import org.traccar.forward.PositionForwarderJson;
+import org.traccar.forward.PositionForwarderAmqp;
 import org.traccar.forward.PositionForwarderKafka;
 import org.traccar.forward.PositionForwarderRedis;
 import org.traccar.forward.PositionForwarderUrl;
@@ -90,10 +93,10 @@ import org.traccar.storage.Storage;
 import org.traccar.web.WebServer;
 import org.traccar.api.security.LoginService;
 
-import javax.annotation.Nullable;
-import javax.inject.Singleton;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
+import jakarta.annotation.Nullable;
+import jakarta.inject.Singleton;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -131,7 +134,7 @@ public class MainModule extends AbstractModule {
         if (config.getBoolean(Keys.WEB_SANITIZE)) {
             objectMapper.registerModule(new SanitizerModule());
         }
-        objectMapper.registerModule(new JSR353Module());
+        objectMapper.registerModule(new JSONPModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return objectMapper;
     }
@@ -197,7 +200,6 @@ public class MainModule extends AbstractModule {
         if (config.getBoolean(Keys.GEOCODER_ENABLE)) {
             String type = config.getString(Keys.GEOCODER_TYPE, "google");
             String url = config.getString(Keys.GEOCODER_URL);
-            String id = config.getString(Keys.GEOCODER_ID);
             String key = config.getString(Keys.GEOCODER_KEY);
             String language = config.getString(Keys.GEOCODER_LANGUAGE);
             String formatString = config.getString(Keys.GEOCODER_FORMAT);
@@ -240,7 +242,7 @@ public class MainModule extends AbstractModule {
                     geocoder = new BanGeocoder(client, cacheSize, addressFormat);
                     break;
                 case "here":
-                    geocoder = new HereGeocoder(client, url, id, key, language, cacheSize, addressFormat);
+                    geocoder = new HereGeocoder(client, url, key, language, cacheSize, addressFormat);
                     break;
                 case "mapmyindia":
                     geocoder = new MapmyIndiaGeocoder(client, url, key, cacheSize, addressFormat);
@@ -300,7 +302,7 @@ public class MainModule extends AbstractModule {
             switch (type) {
                 case "overpass":
                 default:
-                    return new OverpassSpeedLimitProvider(client, url);
+                    return new OverpassSpeedLimitProvider(config, client, url);
             }
         }
         return null;
@@ -340,8 +342,15 @@ public class MainModule extends AbstractModule {
     @Provides
     public static BroadcastService provideBroadcastService(
             Config config, ObjectMapper objectMapper) throws IOException {
-        if (config.hasKey(Keys.BROADCAST_ADDRESS)) {
-            return new MulticastBroadcastService(config, objectMapper);
+        if (config.hasKey(Keys.BROADCAST_TYPE)) {
+            switch (config.getString(Keys.BROADCAST_TYPE)) {
+                case "multicast":
+                    return new MulticastBroadcastService(config, objectMapper);
+                case "redis":
+                    return new RedisBroadcastService(config, objectMapper);
+                default:
+                    break;
+            }
         }
         return new NullBroadcastService();
     }
@@ -352,6 +361,8 @@ public class MainModule extends AbstractModule {
         if (config.hasKey(Keys.EVENT_FORWARD_URL)) {
             String forwardType = config.getString(Keys.EVENT_FORWARD_TYPE);
             switch (forwardType) {
+                case "amqp":
+                    return new EventForwarderAmqp(config, objectMapper);
                 case "kafka":
                     return new EventForwarderKafka(config, objectMapper);
                 case "mqtt":
@@ -371,6 +382,8 @@ public class MainModule extends AbstractModule {
             switch (config.getString(Keys.FORWARD_TYPE)) {
                 case "json":
                     return new PositionForwarderJson(config, client, objectMapper);
+                case "amqp":
+                    return new PositionForwarderAmqp(config, objectMapper);
                 case "kafka":
                     return new PositionForwarderKafka(config, objectMapper);
                 case "redis":

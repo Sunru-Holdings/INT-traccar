@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
+import org.traccar.helper.BufferUtil;
 import org.traccar.model.Device;
 import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
@@ -112,18 +113,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
-    private boolean isPrintable(ByteBuf buf, int length) {
-        boolean printable = true;
-        for (int i = 0; i < length; i++) {
-            byte b = buf.getByte(buf.readerIndex() + i);
-            if (b < 32 && b != '\r' && b != '\n') {
-                printable = false;
-                break;
-            }
-        }
-        return printable;
-    }
-
     private void decodeSerial(
             Channel channel, SocketAddress remoteAddress, DeviceSession deviceSession, Position position, ByteBuf buf) {
 
@@ -169,7 +158,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
             position.set(Position.KEY_TYPE, type);
 
             int length = buf.readInt();
-            if (isPrintable(buf, length)) {
+            if (BufferUtil.isPrintable(buf, length)) {
                 String data = buf.readSlice(length).toString(StandardCharsets.US_ASCII).trim();
                 if (data.startsWith("UUUUww") && data.endsWith("SSS")) {
                     String[] values = data.substring(6, data.length() - 4).split(";");
@@ -252,10 +241,11 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(83, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_USED, b.readUnsignedInt() * 0.1));
         register(84, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedShort() * 0.1));
         register(85, fmbXXX, (p, b) -> p.set(Position.KEY_RPM, b.readUnsignedShort()));
-        register(87, fmbXXX, (p, b) -> p.set(Position.KEY_OBD_ODOMETER, b.readUnsignedInt() * 0.001));
+        register(87, fmbXXX, (p, b) -> p.set(Position.KEY_OBD_ODOMETER, b.readUnsignedInt()));
         register(89, fmbXXX, (p, b) -> p.set("fuelLevelPercentage", b.readUnsignedByte()));
         register(90, null, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedShort()));
         register(110, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_CONSUMPTION, b.readUnsignedShort() * 0.1));
+        register(113, fmbXXX, (p, b) -> p.set(Position.KEY_BATTERY_LEVEL, b.readUnsignedByte()));
         register(179, null, (p, b) -> p.set(Position.PREFIX_OUT + 1, b.readUnsignedByte() > 0));
         register(180, null, (p, b) -> p.set(Position.PREFIX_OUT + 2, b.readUnsignedByte() > 0));
         register(181, null, (p, b) -> p.set(Position.KEY_PDOP, b.readUnsignedShort() * 0.1));
@@ -598,6 +588,38 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                         }
                         index += 1;
                     }
+                } else if (id == 548 || id == 10829 || id == 10831) {
+                    ByteBuf data = buf.readSlice(length);
+                    data.readUnsignedByte(); // header
+                    for (int i = 1; data.isReadable(); i++) {
+                        ByteBuf beacon = data.readSlice(data.readUnsignedByte());
+                        while (beacon.isReadable()) {
+                            int parameterId = beacon.readUnsignedByte();
+                            int parameterLength = beacon.readUnsignedByte();
+                            switch (parameterId) {
+                                case 0:
+                                    position.set("tag" + i + "Rssi", (int) beacon.readByte());
+                                    break;
+                                case 1:
+                                    String beaconId = ByteBufUtil.hexDump(beacon.readSlice(parameterLength));
+                                    position.set("tag" + i + "Id", beaconId);
+                                    break;
+                                case 2:
+                                    String beaconData = ByteBufUtil.hexDump(beacon.readSlice(parameterLength));
+                                    position.set("tag" + i + "Data", beaconData);
+                                    break;
+                                case 13:
+                                    position.set("tag" + i + "LowBattery", beacon.readUnsignedByte());
+                                    break;
+                                case 14:
+                                    position.set("tag" + i + "Battery", beacon.readUnsignedShort());
+                                    break;
+                                default:
+                                    beacon.skipBytes(parameterLength);
+                                    break;
+                            }
+                        }
+                    }
                 } else {
                     position.set(Position.PREFIX_IO + id, ByteBufUtil.hexDump(buf.readSlice(length)));
                 }
@@ -635,7 +657,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 buf.readUnsignedByte(); // type
                 int length = buf.readInt() - 4;
                 getLastLocation(position, new Date(buf.readUnsignedInt() * 1000));
-                if (isPrintable(buf, length)) {
+                if (BufferUtil.isPrintable(buf, length)) {
                     String data = buf.readCharSequence(length, StandardCharsets.US_ASCII).toString().trim();
                     if (data.startsWith("GTSL")) {
                         position.set(Position.KEY_DRIVER_UNIQUE_ID, data.split("\\|")[4]);

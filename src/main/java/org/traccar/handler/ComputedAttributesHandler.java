@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
 
 import io.netty.channel.ChannelHandler;
 import org.apache.commons.jexl3.JexlFeatures;
@@ -42,8 +43,8 @@ import org.traccar.model.Device;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 @Singleton
 @ChannelHandler.Sharable
@@ -58,6 +59,7 @@ public class ComputedAttributesHandler extends BaseDataHandler {
     private final JexlFeatures features;
 
     private final boolean includeDeviceAttributes;
+    private final boolean includeLastAttributes;
 
     @Inject
     public ComputedAttributesHandler(Config config, CacheManager cacheManager) {
@@ -65,6 +67,10 @@ public class ComputedAttributesHandler extends BaseDataHandler {
         JexlSandbox sandbox = new JexlSandbox(false);
         sandbox.allow("com.safe.Functions");
         sandbox.allow(Math.class.getName());
+        List.of(
+            Double.class, Float.class, Integer.class, Long.class, Short.class,
+            Character.class, Boolean.class, String.class, Byte.class)
+                .forEach((type) -> sandbox.allow(type.getName()));
         features = new JexlFeatures()
                 .localVar(config.getBoolean(Keys.PROCESSING_COMPUTED_ATTRIBUTES_LOCAL_VARIABLES))
                 .loops(config.getBoolean(Keys.PROCESSING_COMPUTED_ATTRIBUTES_LOOPS))
@@ -76,6 +82,7 @@ public class ComputedAttributesHandler extends BaseDataHandler {
                 .sandbox(sandbox)
                 .create();
         includeDeviceAttributes = config.getBoolean(Keys.PROCESSING_COMPUTED_ATTRIBUTES_DEVICE_ATTRIBUTES);
+        includeLastAttributes = config.getBoolean(Keys.PROCESSING_COMPUTED_ATTRIBUTES_LAST_ATTRIBUTES);
     }
 
     private MapContext prepareContext(Position position) {
@@ -88,6 +95,10 @@ public class ComputedAttributesHandler extends BaseDataHandler {
                 }
             }
         }
+        Position last = null;
+        if (includeLastAttributes) {
+            last = cacheManager.getPosition(position.getDeviceId());
+        }
         Set<Method> methods = new HashSet<>(Arrays.asList(position.getClass().getMethods()));
         Arrays.asList(Object.class.getMethods()).forEach(methods::remove);
         for (Method method : methods) {
@@ -97,9 +108,17 @@ public class ComputedAttributesHandler extends BaseDataHandler {
                 try {
                     if (!method.getReturnType().equals(Map.class)) {
                         result.set(name, method.invoke(position));
+                        if (last != null) {
+                            result.set(prefixAttribute("last", name), method.invoke(last));
+                        }
                     } else {
-                        for (Object key : ((Map<?, ?>) method.invoke(position)).keySet()) {
-                            result.set((String) key, ((Map<?, ?>) method.invoke(position)).get(key));
+                        for (Map.Entry<?, ?> entry : ((Map<?, ?>) method.invoke(position)).entrySet()) {
+                            result.set((String) entry.getKey(), entry.getValue());
+                        }
+                        if (last != null) {
+                            for (Map.Entry<?, ?> entry : ((Map<?, ?>) method.invoke(last)).entrySet()) {
+                                result.set(prefixAttribute("last", (String) entry.getKey()), entry.getValue());
+                            }
                         }
                     }
                 } catch (IllegalAccessException | InvocationTargetException error) {
@@ -108,6 +127,10 @@ public class ComputedAttributesHandler extends BaseDataHandler {
             }
         }
         return result;
+    }
+
+    private String prefixAttribute(String prefix, String key) {
+        return prefix + Character.toUpperCase(key.charAt(0)) + key.substring(1);
     }
 
     /**

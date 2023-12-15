@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 - 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2019 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -234,11 +234,18 @@ public final class Keys {
             List.of(KeyType.CONFIG, KeyType.DEVICE));
 
     /**
+     * Disable commands for the protocol. Not all protocols support this option.
+     */
+    public static final ConfigSuffix<Boolean> PROTOCOL_DISABLE_COMMANDS = new BooleanConfigSuffix(
+            ".disableCommands",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Protocol format. Used by protocols that have configurable message format.
      */
     public static final ConfigSuffix<String> PROTOCOL_FORMAT = new StringConfigSuffix(
             ".format",
-            List.of(KeyType.DEVICE));
+            List.of(KeyType.CONFIG, KeyType.DEVICE));
 
     /**
      * Protocol date format. Used by protocols that have configurable date format.
@@ -332,6 +339,15 @@ public final class Keys {
             "speedLimit",
             List.of(KeyType.SERVER, KeyType.DEVICE),
             0.0);
+
+    /**
+     * Speed limit threshold multiplier. For example, if the speed limit is 100, but we only want to generate an event
+     * if the speed is higher than 105, this parameter can be set to 1.05. Default multiplier is 1.0.
+     */
+    public static final ConfigKey<Double> EVENT_OVERSPEED_THRESHOLD_MULTIPLIER = new DoubleConfigKey(
+            "event.overspeed.thresholdMultiplier",
+            List.of(KeyType.CONFIG),
+            1.0);
 
     /**
      * Minimal over speed duration to trigger the event. Value in seconds.
@@ -739,6 +755,14 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Maximum API request duration in seconds.
+     */
+    public static final ConfigKey<Integer> WEB_MAX_REQUEST_SECONDS = new IntegerConfigKey(
+            "web.maxRequestSec",
+            List.of(KeyType.CONFIG),
+            600);
+
+    /**
      * Sanitize all strings returned via API. This is needed to fix XSS issues in the old web interface. New React-based
      * interface doesn't require this.
      */
@@ -814,6 +838,20 @@ public final class Keys {
             "max-age=3600,public");
 
     /**
+     * Enable TOTP authentication on the server.
+     */
+    public static final ConfigKey<Boolean> WEB_TOTP_ENABLE = new BooleanConfigKey(
+            "totpEnable",
+            List.of(KeyType.SERVER));
+
+    /**
+     * Server attribute that indicates that TOTP authentication is required for new users.
+     */
+    public static final ConfigKey<Boolean> WEB_TOTP_FORCE = new BooleanConfigKey(
+            "totpForce",
+            List.of(KeyType.SERVER));
+
+    /**
      * Host for raw data forwarding.
      */
     public static final ConfigKey<String> SERVER_FORWARD = new StringConfigKey(
@@ -829,7 +867,15 @@ public final class Keys {
             "url");
 
     /**
-     * Position forwarding Kafka topic.
+     * Position forwarding AMQP exchange.
+     */
+    public static final ConfigKey<String> FORWARD_EXCHANGE = new StringConfigKey(
+            "forward.exchange",
+            List.of(KeyType.CONFIG),
+            "traccar");
+
+    /**
+     * Position forwarding Kafka topic or AQMP Routing Key.
      */
     public static final ConfigKey<String> FORWARD_TOPIC = new StringConfigKey(
             "forward.topic",
@@ -898,7 +944,15 @@ public final class Keys {
             "json");
 
     /**
-     * Events forwarding Kafka topic.
+     * Events forwarding AMQP exchange.
+     */
+    public static final ConfigKey<String> EVENT_FORWARD_EXCHANGE = new StringConfigKey(
+            "event.forward.exchange",
+            List.of(KeyType.CONFIG),
+            "traccar");
+
+    /**
+     * Events forwarding Kafka topic or AQMP Routing Key.
      */
     public static final ConfigKey<String> EVENT_FORWARD_TOPIC = new StringConfigKey(
             "event.forward.topic",
@@ -1112,6 +1166,15 @@ public final class Keys {
     public static final ConfigKey<String> NOTIFICATOR_TYPES = new StringConfigKey(
             "notificator.types",
             List.of(KeyType.CONFIG));
+
+    /**
+     * If the event time is too old, we should not send notifications. This parameter is the threshold value in
+     * milliseconds. Default value is 15 minutes.
+     */
+    public static final ConfigKey<Long> NOTIFICATOR_TIME_THRESHOLD = new LongConfigKey(
+            "notificator.timeThreshold",
+            List.of(KeyType.CONFIG),
+            15 * 60 * 1000L);
 
     /**
      * Traccar notification API key.
@@ -1328,6 +1391,13 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Filter position if the daily limit is exceeded for the device.
+     */
+    public static final ConfigKey<Integer> FILTER_DAILY_LIMIT = new IntegerConfigKey(
+            "filter.dailyLimit",
+            List.of(KeyType.CONFIG));
+
+    /**
      * If false, the server expects all locations to come sequentially (for each device). Filter checks for duplicates,
      * distance, speed, or time period only against the location that was last received by server.
      * If true, the server expects locations to come at random order (since tracking device might go offline).
@@ -1435,10 +1505,17 @@ public final class Keys {
             List.of(KeyType.CONFIG, KeyType.DEVICE));
 
     /**
-     * Enable computed attributes processing.
+     * Include device attributes in the computed attribute context.
      */
     public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_DEVICE_ATTRIBUTES = new BooleanConfigKey(
             "processing.computedAttributes.deviceAttributes",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Include last position attributes in the computed attribute context.
+     */
+    public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_LAST_ATTRIBUTES = new BooleanConfigKey(
+            "processing.computedAttributes.lastAttributes",
             List.of(KeyType.CONFIG));
 
     /**
@@ -1483,13 +1560,6 @@ public final class Keys {
      */
     public static final ConfigKey<String> GEOCODER_URL = new StringConfigKey(
             "geocoder.url",
-            List.of(KeyType.CONFIG));
-
-    /**
-     * App id for use with Here provider.
-     */
-    public static final ConfigKey<String> GEOCODER_ID = new StringConfigKey(
-            "geocoder.id",
             List.of(KeyType.CONFIG));
 
     /**
@@ -1596,6 +1666,13 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Process geolocation only when Wi-Fi information is available. This makes the result more accurate.
+     */
+    public static final ConfigKey<Boolean> GEOLOCATION_REQUIRE_WIFI = new BooleanConfigKey(
+            "geolocation.requireWifi",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Default MCC value to use if device doesn't report MCC.
      */
     public static final ConfigKey<Integer> GEOLOCATION_MCC = new IntegerConfigKey(
@@ -1629,6 +1706,14 @@ public final class Keys {
     public static final ConfigKey<String> SPEED_LIMIT_URL = new StringConfigKey(
             "speedLimit.url",
             List.of(KeyType.CONFIG));
+
+    /**
+     * Search radius for speed limit. Value is in meters. Default value is 100.
+     */
+    public static final ConfigKey<Integer> SPEED_LIMIT_ACCURACY = new IntegerConfigKey(
+            "speedLimit.accuracy",
+            List.of(KeyType.CONFIG),
+            100);
 
     /**
      * Override latitude sign / hemisphere. Useful in cases where value is incorrect because of device bug. Value can be
@@ -1756,6 +1841,14 @@ public final class Keys {
             "time,position,speed,course,accuracy,result");
 
     /**
+     * Broadcast method. Available options are "multicast" and "redis". By default (if the value is not
+     * specified or does not matches available options) server disables broadcast.
+     */
+    public static final ConfigKey<String> BROADCAST_TYPE = new StringConfigKey(
+            "broadcast.type",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Multicast interface. It can be either an IP address or an interface name.
      */
     public static final ConfigKey<String> BROADCAST_INTERFACE = new StringConfigKey(
@@ -1763,7 +1856,7 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
-     * Multicast address for broadcasting synchronization events.
+     * Multicast address or Redis URL for broadcasting synchronization events.
      */
     public static final ConfigKey<String> BROADCAST_ADDRESS = new StringConfigKey(
             "broadcast.address",
