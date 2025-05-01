@@ -38,11 +38,11 @@ public class DatabaseHandler extends BasePositionHandler {
     }
 
     @Override
-    public void handlePosition(Position position, Callback callback) {
+    public void onPosition(Position position, Callback callback) {
 
         try {
             position.setId(storage.addObject(position, new Request(new Columns.Exclude("id"))));
-            statisticsManager.messageStoredCount(position.getDeviceId());
+            statisticsManager.registerMessageStored(position.getDeviceId(), position.getProtocol());
         } catch (Exception error) {
             LOGGER.warn("Failed to store position", error);
         }
